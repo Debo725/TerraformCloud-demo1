@@ -21,7 +21,7 @@ tenant_id       = var.tenantID
 
 ##Create a Resource Group
 resource "azurerm_resource_group" "app_rg1" {
-  name     = "TF-Cloud-Demo1-RG"
+  name     = "KiawiTechSTAGE-RG"
   location = "East US"
 }
 
@@ -128,4 +128,14 @@ resource "azurerm_windows_virtual_machine" "app_vm" {
   depends_on = [
     azurerm_network_interface.app_nic
   ]
+}
+
+##Add a Recovery Service Vault
+resource "azurerm_recovery_services_vault" "app_vault" {
+  name                = "Demo-Vault"
+  location            = azurerm_resource_group.app_rg1.location
+  resource_group_name = azurerm_resource_group.app_rg1.name
+  sku                 = "Standard"
+
+  soft_delete_enabled = false
 }
