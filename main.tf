@@ -51,7 +51,7 @@ resource "azurerm_virtual_network" "app_vnet" {
 
 ###Create a NSG
 resource "azurerm_network_security_group" "app_nsg" {
-  name                = "example-nsg"
+  name                = "App-NSG"
   location            = azurerm_resource_group.app_rg1.location
   resource_group_name = azurerm_resource_group.app_rg1.name
 
@@ -130,12 +130,3 @@ resource "azurerm_windows_virtual_machine" "app_vm" {
   ]
 }
 
-##Add a Recovery Service Vault
-resource "azurerm_recovery_services_vault" "app_vault" {
-  name                = "Demo-Vault"
-  location            = azurerm_resource_group.app_rg1.location
-  resource_group_name = azurerm_resource_group.app_rg1.name
-  sku                 = "Standard"
-
-  soft_delete_enabled = false
-}
