@@ -19,114 +19,85 @@ tenant_id       = var.tenantID
 }
 
 
-##Create a Resource Group
-resource "azurerm_resource_group" "app_rg1" {
-  name     = "KiawiTechSTAGE-RG"
-  location = "East US"
+# TODO set the variables below either enter them in plain text after = sign, or change them in variables.tf
+#  (var.xyz will take the default value from variables.tf if you don't change it)
+
+# Create resource group
+resource "azurerm_resource_group" "example" {
+  name     = var.azurerm_resource_group_name
+  location = var.location
 }
 
-##Create A VNet
-resource "azurerm_virtual_network" "app_vnet" {
-  name                = "app-vnet"
-  location            = azurerm_resource_group.app_rg1.location
-  resource_group_name = azurerm_resource_group.app_rg1.name
+# Create security group
+resource "azurerm_network_security_group" "example" {
+  name                = var.azurerm_network_security_group_name
+  location            = azurerm_resource_group.example.location
+  resource_group_name = azurerm_resource_group.example.name
+}
+
+# Create a virtual network
+resource "azurerm_virtual_network" "example" {
+  name                = var.azurerm_virtual_network_name
+  resource_group_name = azurerm_resource_group.example.name
   address_space       = ["10.0.0.0/16"]
-
-  depends_on = [
-    azurerm_resource_group.app_rg1
-  ]
+  location            = azurerm_resource_group.example.location
 }
 
-##Create a Subnet
-  resource "azurerm_subnet" "app_subnet" {
-  name                 = "app-subnet1"
-  resource_group_name  = azurerm_resource_group.app_rg1.name
-  virtual_network_name = azurerm_virtual_network.app_vnet.name
-  address_prefixes     = ["10.0.1.0/24"]
+# Create a subnet
+resource "azurerm_subnet" "example" {
+  name                 = var.azurerm_subnet_name
+  resource_group_name  = azurerm_resource_group.example.name
+  virtual_network_name = azurerm_virtual_network.example.name
+  address_prefixes     = ["10.0.0.0/24"]
 
-  depends_on = [
-    azurerm_virtual_network.app_vnet
-  ]
-  }
+  delegation {
+    name = "managedinstancedelegation"
 
-###Create a NSG
-resource "azurerm_network_security_group" "app_nsg" {
-  name                = "App-NSG"
-  location            = azurerm_resource_group.app_rg1.location
-  resource_group_name = azurerm_resource_group.app_rg1.name
-
-  security_rule {
-    name                       = "test123"
-    priority                   = 100
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "*"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
+    service_delegation {
+      name = "Microsoft.Sql/managedInstances"
+      actions = [
+        "Microsoft.Network/virtualNetworks/subnets/join/action",
+        "Microsoft.Network/virtualNetworks/subnets/prepareNetworkPolicies/action",
+        "Microsoft.Network/virtualNetworks/subnets/unprepareNetworkPolicies/action"
+      ]
+    }
   }
 }
 
+# Associate subnet and the security group
 resource "azurerm_subnet_network_security_group_association" "example" {
-  subnet_id                 = azurerm_subnet.app_subnet.id
-  network_security_group_id = azurerm_network_security_group.app_nsg.id
+  subnet_id                 = azurerm_subnet.example.id
+  network_security_group_id = azurerm_network_security_group.example.id
 }
 
-##Create a NIC
-resource "azurerm_network_interface" "app_nic" {
-  name                = "appvm1-nic"
-  location            = azurerm_resource_group.app_rg1.location
-  resource_group_name = azurerm_resource_group.app_rg1.name
-
-  ip_configuration {
-    name                          = "internal"
-    subnet_id                     = azurerm_subnet.app_subnet.id
-    private_ip_address_allocation = "Dynamic"
-    public_ip_address_id = azurerm_public_ip.app_pip.id
-  }
-
-
-  depends_on = [
-    azurerm_virtual_network.app_vnet, azurerm_subnet.app_subnet, azurerm_public_ip.app_pip
-  ]
+# Create a route table
+resource "azurerm_route_table" "example" {
+  name                          = "mi-RT"
+  location                      = azurerm_resource_group.example.location
+  resource_group_name           = azurerm_resource_group.example.name
+  disable_bgp_route_propagation = false
 }
 
-##Create a Public IP Address
-resource "azurerm_public_ip" "app_pip" {
-  name                = "appvm-pip"
-  resource_group_name = azurerm_resource_group.app_rg1.name
-  location            = azurerm_resource_group.app_rg1.location
-  allocation_method   = "Static"
-
+# Associate subnet and the route table
+resource "azurerm_subnet_route_table_association" "example" {
+  subnet_id      = azurerm_subnet.example.id
+  route_table_id = azurerm_route_table.example.id
 }
 
-##Create a Windows VM
-resource "azurerm_windows_virtual_machine" "app_vm" {
-  name                = "appvm1"
-  resource_group_name = azurerm_resource_group.app_rg1.name
-  location            = azurerm_resource_group.app_rg1.location
-  size                = "Standard_B4ms"
-  admin_username      = "ClusterAdmin"
-  admin_password      = "@Password1234!"
-  network_interface_ids = [
-    azurerm_network_interface.app_nic.id,
-  ]
-
-  os_disk {
-    caching              = "ReadWrite"
-    storage_account_type = "Standard_LRS"
-  }
-
-  source_image_reference {
-    publisher = "MicrosoftWindowsServer"
-    offer     = "WindowsServer"
-    sku       = "2019-Datacenter"
-    version   = "latest"
-  }
-
-  depends_on = [
-    azurerm_network_interface.app_nic
-  ]
+# Create managed instance
+resource "azurerm_mssql_managed_instance" "example" {
+  name                         = var.database_name
+  resource_group_name          = azurerm_resource_group.example.name
+  location                     = azurerm_resource_group.example.location
+  subnet_id                    = azurerm_subnet.example.id
+  administrator_login          = var.administrator_login
+  administrator_login_password = var.administrator_login_password
+  license_type                 = var.license_type
+  sku_name                     = var.sku_name
+  vcores                       = var.vcores
+  storage_size_in_gb           = var.storage_size_in_gb
+  storage_account_type         = var.storage_account_type
+  public_data_endpoint_enabled = true
+  timezone_id                  = "INDIANA"
 }
 
